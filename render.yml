@@ -1,0 +1,17 @@
+services:
+  # setup backend web service on Render
+  - type: web
+    name: smartplanner-backend
+    # set runtime language to Docker so it builds the image using the defined Dockerfile
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    # do not deploy before CI checks and database migrations are successful
+    autoDeploy: false
+    envVars:
+      # need to manually add all env vars in backend service (only solution for separate repo)
+      - key: DATABASE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

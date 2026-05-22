@@ -1,0 +1,26 @@
+version: '3.9'
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smartplanner-backend
+    # stop running container if execute cmd "docker compose stop"
+    # otherwise restart even when container crashes
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      # mount the backend code into the container for hot reload, but exclude node_modules to avoid conflicts between host and container  
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - smartplanner
+
+networks:
+  # define a custom network for the services to containers to reach each other
+  smartplanner:
+    name: smartplanner
+    driver: bridge
