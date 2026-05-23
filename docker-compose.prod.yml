@@ -3,7 +3,6 @@ version: '3.9'
 services:
   backend:
     build:
-      context: ./backend
       dockerfile: Dockerfile
     container_name: smartplanner-backend-prod
     # avoid downtime by restarting the container if it crashes (unhandled exceptions/out of memory etc.)

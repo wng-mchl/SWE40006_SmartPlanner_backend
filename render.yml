@@ -4,7 +4,7 @@ services:
     name: smartplanner-backend
     # set runtime language to Docker so it builds the image using the defined Dockerfile
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: Dockerfile
     # do not deploy before CI checks and database migrations are successful
     autoDeploy: false
     envVars:
