@@ -1,0 +1,103 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Docker image
+        run: docker build -t smartplanner-backend:ci .
+
+      - name: Check for schema drift
+        if: github.event_name == 'push'
+        run: |
+          npx prisma migrate diff \
+            --from-url "${{ secrets.DATABASE_URL }}" \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code || (echo "Schema drift detected — database is out of sync with migration files" && exit 1)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Apply database migrations
+        if: github.event_name == 'push'
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Deploy to staging
+        if: github.event_name == 'push'
+        run: curl -f -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK_BACKEND }}"
+
+      - name: Verify deployment
+        if: github.event_name == 'push'
+        run: |
+          echo "Waiting for Render to spin up..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.RENDER_BACKEND_URL }}/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "Deployment live!"
+              curl -s ${{ secrets.RENDER_BACKEND_URL }}/health
+              exit 0
+            fi
+            echo "Attempt $i: got $STATUS, retrying in 15s..."
+            sleep 15
+          done
+          echo "Deployment did not become healthy in time"
+          exit 1
+
+  deploy-production:
+    needs: test-and-deploy
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: production-backend
+      cancel-in-progress: false
+
+    steps:
+      - name: Deploy to AWS EC2 via Docker Compose
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/SWE40006_SmartPlanner_backend
+            git pull origin main
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml exec -T backend npx prisma migrate deploy
+
+      - name: Verify EC2 deployment
+        run: |
+          echo "Waiting for EC2 backend to respond..."
+          for i in $(seq 1 6); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}:3000/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "EC2 deployment live!"
+              exit 0
+            fi
+            echo "Attempt $i: got $STATUS, retrying in 10s..."
+            sleep 10
+          done
+          echo "EC2 did not respond in time"
+          exit 1
