@@ -29,15 +29,8 @@ jobs:
       - name: Snyk Code test
         run: snyk code test --sarif > snyk-code.sarif || true
 
-      - name: Snyk Open Source monitor frontend
-        run: |
-          cd smartplanner-src
-          snyk monitor || true
-
-      - name: Snyk Open Source monitor backend
-        run: |
-          cd backend
-          snyk monitor || true
+      - name: Snyk Open Source monitor
+        run: snyk monitor || true
 
       - name: Snyk IaC test
         run: snyk iac test || true
