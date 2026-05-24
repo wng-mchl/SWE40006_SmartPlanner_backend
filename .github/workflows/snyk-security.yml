@@ -1,0 +1,49 @@
+name: Snyk Security
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 0 * * 0"
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  snyk:
+    runs-on: ubuntu-latest
+
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: Snyk Code test
+        run: snyk code test --sarif > snyk-code.sarif || true
+
+      - name: Snyk Open Source monitor frontend
+        run: |
+          cd smartplanner-src
+          snyk monitor || true
+
+      - name: Snyk Open Source monitor backend
+        run: |
+          cd backend
+          snyk monitor || true
+
+      - name: Snyk IaC test
+        run: snyk iac test || true
+
+      - name: Upload Snyk Code result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk-code.sarif
