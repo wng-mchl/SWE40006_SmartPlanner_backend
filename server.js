@@ -36,3 +36,11 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
 });
+
+// graceful shutdown
+process.on("SIGTERM", () => {
+  server.close(() => {
+    // server.close() stops accepting new requests, waits for in-flight requests to finish
+    process.exit(0);
+  });
+});
